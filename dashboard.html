@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>IoT Locator Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+</head>
+<body class="h-screen bg-gray-50 relative">
+
+  <!-- Map -->
+  <div id="map" class="absolute inset-0 z-0"></div>
+
+  <!-- Floating Area Left (Add Device / Form) -->
+  <div id="floatingArea" class="fixed top-5 left-5 z-50">
+    <button id="addDeviceButton" onclick="showRegisterForm()" 
+            class="flex items-center justify-center gap-2 min-w-[140px] md:min-w-[160px] px-3 md:px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium text-base rounded-md transform hover:scale-105 transition-transform duration-200 shadow">
+      <span class="text-lg">+</span>
+      <span class="text-base">Add New Device</span>
+    </button>
+  </div>
+
+  <!-- Floating Logout Button Right -->
+  <div id="logoutArea" class="fixed top-5 right-5 z-50">
+    <button onclick="logout()" 
+            class="flex items-center justify-center gap-2 min-w-[100px] md:min-w-[140px] px-3 md:px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium text-base rounded-md transform hover:scale-105 transition-transform duration-200 shadow">
+      <span class="text-base">Logout</span>
+    </button>
+  </div>
+
+  <!-- Load script -->
+  <script src="js/dashboard.js"></script>
+
+</body>
+</html>
