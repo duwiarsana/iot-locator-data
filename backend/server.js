@@ -8,6 +8,20 @@ const path = require('path');
 
 const app = express();
 const db = new sqlite3.Database('./users.db');
+
+// Create devices table if not exists
+// id unik, latlong, alamatLokasi, mqttIp, mqttPort, mqttUsername, mqttPassword, topics (JSON)
+db.run(`CREATE TABLE IF NOT EXISTS devices (
+  id TEXT PRIMARY KEY,
+  latlong TEXT,
+  alamatLokasi TEXT,
+  mqttIp TEXT,
+  mqttPort TEXT,
+  mqttUsername TEXT,
+  mqttPassword TEXT,
+  topics TEXT
+)`);
+
 const PORT = 3001;
 
 // Middleware
@@ -31,10 +45,6 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, '../index.html'));
 });
 
-// Fallback route for any other GET requests
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../index.html'));
-});
 
 // Create users table if not exists
 // username unique, password hashed
@@ -46,6 +56,74 @@ db.run(`CREATE TABLE IF NOT EXISTS users (
   nomor_hp TEXT,
   email TEXT
 )`);
+
+// Endpoint GET daftar device
+app.get('/devices', (req, res) => {
+  db.all('SELECT * FROM devices', [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    // Parse topics JSON jika ada
+    const devices = rows.map(row => ({
+      ...row,
+      topics: row.topics ? JSON.parse(row.topics) : []
+    }));
+    res.json(devices);
+  });
+});
+
+// Endpoint GET detail device
+app.get('/devices/:id', (req, res) => {
+  const { id } = req.params;
+  db.get('SELECT * FROM devices WHERE id = ?', [id], (err, row) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    if (!row) return res.status(404).json({ error: 'Device not found' });
+    console.log('GET /devices/:id result:', row);
+    res.json({ ...row, topics: row.topics ? JSON.parse(row.topics) : [], alamatLokasi: row.alamatLokasi || '' });
+  });
+});
+
+// Endpoint PUT update device
+app.put('/devices/:id', (req, res) => {
+  const { id } = req.params;
+  let { latlong, alamatLokasi, mqttIp, mqttPort, mqttUsername, mqttPassword, topics } = req.body;
+  // Pastikan alamatLokasi selalu string!
+  alamatLokasi = typeof alamatLokasi === 'string' ? alamatLokasi : '';
+  console.log('PUT /devices/:id body:', req.body);
+  db.run(
+    'UPDATE devices SET latlong = ?, alamatLokasi = ?, mqttIp = ?, mqttPort = ?, mqttUsername = ?, mqttPassword = ?, topics = ? WHERE id = ?',
+    [latlong, alamatLokasi, mqttIp, mqttPort, mqttUsername, mqttPassword, JSON.stringify(topics), id],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      if (this.changes === 0) return res.status(404).json({ error: 'Device not found' });
+      console.log('Device updated, id:', id, 'alamatLokasi:', alamatLokasi);
+      res.json({ success: true });
+    }
+  );
+});
+
+// Endpoint register device
+app.post('/devices', async (req, res) => {
+  try {
+    const { id, latlong, alamatLokasi, mqttIp, mqttPort, mqttUsername, mqttPassword, topics } = req.body;
+    if (!id || !mqttIp || !mqttPort || !topics) {
+      return res.status(400).json({ error: 'Field wajib tidak lengkap' });
+    }
+    await new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO devices (id, latlong, alamatLokasi, mqttIp, mqttPort, mqttUsername, mqttPassword, topics) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, latlong, alamatLokasi, mqttIp, mqttPort, mqttUsername, mqttPassword, JSON.stringify(topics)],
+        function(err) {
+          if (err) return reject(err);
+          resolve();
+        }
+      );
+    });
+    res.json({ success: true, message: 'Device registered' });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+});
 
 // Register endpoint
 app.post('/register', async (req, res) => {
@@ -160,6 +238,39 @@ app.post('/login', async (req, res) => {
   }
 });
 
+// Change Password Endpoint
+app.post('/change-password', async (req, res) => {
+  try {
+    const { userId, currentPassword, newPassword } = req.body;
+    if (!userId || !currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'All fields are required.' });
+    }
+    // Get user from DB
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE id = ?', [userId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row);
+      });
+    });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    // Check old password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) return res.status(400).json({ error: 'Current password is incorrect.' });
+    // Hash new password
+    const hashed = await bcrypt.hash(newPassword, 10);
+    // Update user password
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE users SET password = ? WHERE id = ?', [hashed, userId], function(err) {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+    res.json({ success: true, message: 'Password changed successfully.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
 // Dashboard page
 app.get('/dashboard.html', (req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard.html'));
@@ -238,6 +349,11 @@ app.put('/users/:id/role', async (req, res) => {
     console.error('Update user role error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// Fallback route for any other GET requests (paling bawah)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../index.html'));
 });
 
 app.listen(PORT, () => {

@@ -10,6 +10,70 @@
 </head>
 <body class="min-h-screen bg-gray-50">
   <div id="dashboard" class="min-h-screen hidden">
+    <!-- Account Modal -->
+    <div id="account-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-96 max-w-md">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-gray-900">Account Settings</h2>
+          <button onclick="document.getElementById('account-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Profile Section -->
+        <div class="space-y-4 mb-6">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Username</label>
+            <input type="text" id="username" placeholder="Your username" class="text-base py-2 px-3 mb-1 block w-full bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+            <input type="email" id="email" placeholder="youremail@example.com" class="text-base py-2 px-3 mb-1 block w-full bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Role</label>
+            <input type="text" id="role" readonly class="text-base py-2 px-3 mb-1 block w-full bg-gray-100 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-not-allowed" />
+          </div>
+        </div>
+
+        <!-- Password Section -->
+        <div class="border-t border-gray-200 pt-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">Change Password</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+              <input type="password" id="currentPassword" placeholder="Current password" class="text-base py-2 px-3 mb-1 block w-full bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+              <input type="password" id="newPassword" placeholder="New password" class="text-base py-2 px-3 mb-1 block w-full bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+              <input type="password" id="confirmPassword" placeholder="Confirm new password" class="text-base py-2 px-3 mb-1 block w-full bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+            </div>
+            <div class="flex justify-end">
+              <button onclick="changePassword()" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                Change Password
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-6 flex justify-end space-x-3">
+          <button onclick="document.getElementById('account-modal').classList.add('hidden')" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button onclick="saveAccount()" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Map Container -->
     <div id="map-container" class="relative h-full w-full">
       <div id="map" class="absolute inset-0 z-0" style="width: 100%; height: 100%;"></div>
@@ -17,15 +81,40 @@
 
     <!-- Floating Area -->
     <div id="floatingArea" class="fixed top-4 left-4 z-50" style="z-index: 1000;">
-      <button id="addDeviceButton" onclick="showDeviceRegisterForm()" 
-              class="flex items-center justify-center gap-2 min-w-[140px] md:min-w-[160px] px-3 md:px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium text-base rounded-md transform hover:scale-105 transition-transform duration-200 shadow">
-        <span class="text-lg">+</span>
-        <span class="text-base">Add New Device</span>
+      <button id="manageDeviceButton" onclick="showDeviceListModal()" 
+              class="flex items-center justify-center min-w-[140px] md:min-w-[160px] px-3 md:px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium text-base rounded-md transform hover:scale-105 transition-transform duration-200 shadow">
+        Manage Device
       </button>
     </div>
 
-    <!-- Floating Logout Button Right -->
-    <div id="logoutArea" class="fixed top-5 right-5 z-50" style="z-index: 1000;">
+    <!-- Device List Modal -->
+    <div id="deviceListModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl relative">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-gray-900">Device List</h2>
+          <button onclick="hideDeviceListModal()" class="text-gray-400 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div id="deviceListContainer" class="mb-4 max-h-64 overflow-y-auto">
+          <!-- Device list will be rendered here by JS -->
+        </div>
+        <div class="flex justify-end">
+          <button onclick="showDeviceRegisterFormFromList()" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+            Add New Device
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Account and Logout Buttons -->
+    <div id="logoutArea" class="fixed top-5 right-5 z-50 flex items-center gap-3" style="z-index: 1000;">
+      <button onclick="showAccount()" 
+              class="flex items-center justify-center gap-2 min-w-[100px] md:min-w-[140px] px-3 md:px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium text-base rounded-md transform hover:scale-105 transition-transform duration-200 shadow">
+        <span class="text-base">Account</span>
+      </button>
       <button onclick="logout()" 
               class="flex items-center justify-center gap-2 min-w-[100px] md:min-w-[140px] px-3 md:px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium text-base rounded-md transform hover:scale-105 transition-transform duration-200 shadow">
         <span class="text-base">Logout</span>
@@ -35,6 +124,7 @@
 
   <!-- Load MQTT.js before dashboard.js -->
   <script src="js/dashboard.js"></script>
+  <script src="js/device_modal.js"></script>
   <script>
     // Initialize dashboard when page loads
     document.addEventListener('DOMContentLoaded', () => {

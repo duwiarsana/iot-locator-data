@@ -410,6 +410,89 @@ function initMap() {
 }
 
 
+// Submit Edit Device
+window.submitEditDevice = function(id) {
+    const latlong = document.getElementById('latlong')?.value || '';
+    const mqttIp = document.getElementById('mqttIp')?.value || '';
+    const mqttPort = document.getElementById('mqttPort')?.value || '';
+    const mqttUsername = document.getElementById('mqttUsername')?.value || '';
+    const mqttPassword = document.getElementById('mqttPassword')?.value || '';
+    // Ambil semua pasangan topic & keterangan
+    const topicInputs = document.querySelectorAll('.topic-input');
+    const ketInputs = document.querySelectorAll('.keterangan-input');
+    const topics = Array.from(topicInputs).map((input, i) => {
+        return {
+            topic: input.value,
+            keterangan: ketInputs[i]?.value || ''
+        };
+    }).filter(t => t.topic);
+
+    if (!mqttIp || !mqttPort || topics.length === 0) {
+        alert('Isi semua field yang wajib dan minimal satu topic!');
+        return;
+    }
+
+    const alamatLokasiInput = document.getElementById('alamatLokasi');
+    let alamatLokasi = alamatLokasiInput && alamatLokasiInput.value ? alamatLokasiInput.value : '';
+    if (alamatLokasi === '[object Object]') alamatLokasi = '';
+    console.log('Alamat yang akan dikirim:', alamatLokasi);
+    fetch(`http://localhost:3001/devices/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ latlong, alamatLokasi, mqttIp, mqttPort, mqttUsername, mqttPassword, topics })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert('Device updated!');
+        cancelRegister();
+    })
+    .catch(err => {
+        alert('Gagal update device');
+        console.error(err);
+    });
+}
+
+// Edit Device
+window.editDevice = function(id) {
+    fetch(`http://localhost:3001/devices/${id}`)
+        .then(res => res.json())
+        .then(device => {
+            const area = document.getElementById('floatingArea');
+            area.innerHTML = `
+              <form id="device-edit-form" class="bg-white p-4 rounded-md shadow-md flex flex-col gap-2 min-w-[220px]">
+                <div class="font-bold mb-2">Edit Device</div>
+                <input type="text" id="deviceId" class="border rounded p-1" placeholder="Device ID" value="${device.id}" readonly />
+                <input type="text" id="latlong" class="border rounded p-1" placeholder="Latitude,Longitude" value="${device.latlong||''}" />
+<input type="text" id="alamatLokasi" class="border rounded p-1" placeholder="Alamat Lokasi" value="${typeof device.alamatLokasi === 'string' ? device.alamatLokasi : ''}" />
+                <input type="text" id="mqttIp" class="border rounded p-1" placeholder="MQTT IP" value="${device.mqttIp||''}" />
+                <input type="text" id="mqttPort" class="border rounded p-1" placeholder="MQTT Port" value="${device.mqttPort||''}" />
+                <input type="text" id="mqttUsername" class="border rounded p-1" placeholder="MQTT Username (optional)" value="${device.mqttUsername||''}" />
+                <input type="password" id="mqttPassword" class="border rounded p-1" placeholder="MQTT Password (optional)" value="${device.mqttPassword||''}" />
+                <div class="flex flex-col gap-1" id="topicsArea">
+                  ${(device.topics||[]).map((t,i) => `
+                    <div class='flex gap-2'>
+                      <input type='text' class='topic-input w-full border rounded-md p-2' placeholder='MQTT Topic' value='${t.topic||''}' />
+                      <input type='text' class='keterangan-input w-full border rounded-md p-2' placeholder='Keterangan' value='${t.keterangan||''}' />
+                      <button type='button' onclick='this.parentNode.remove()' class='bg-red-500 text-white px-3 py-1 rounded'>-</button>
+                    </div>
+                  `).join('')}
+                  <div class='flex gap-2'>
+                    <button type='button' onclick='addTopicRow()' class='bg-green-500 text-white px-3 py-1 rounded'>+ Topik</button>
+                  </div>
+                </div>
+                <div class="flex gap-2 mt-2">
+                  <button type="button" onclick="submitEditDevice('${device.id}')" class="bg-blue-500 text-white px-3 py-1 rounded">Update</button>
+                  <button type="button" onclick="cancelRegister()" class="bg-gray-300 px-3 py-1 rounded">Cancel</button>
+                </div>
+              </form>
+            `;
+        })
+        .catch(err => {
+            alert('Gagal mengambil data device');
+            console.error(err);
+        });
+}
+
 // Add Device Form Handling
 function showDeviceRegisterForm() {
     const area = document.getElementById('floatingArea');
@@ -418,8 +501,11 @@ function showDeviceRegisterForm() {
         <div class="font-bold mb-2">Register Device</div>
         <input type="text" id="deviceId" class="border rounded p-1" placeholder="Device ID" readonly />
         <input type="text" id="latlong" class="border rounded p-1" placeholder="Latitude,Longitude" />
+<input type="text" id="alamatLokasi" class="border rounded p-1" placeholder="Alamat Lokasi" />
         <input type="text" id="mqttIp" class="border rounded p-1" placeholder="MQTT IP" />
         <input type="text" id="mqttPort" class="border rounded p-1" placeholder="MQTT Port" />
+        <input type="text" id="mqttUsername" class="border rounded p-1" placeholder="MQTT Username (optional)" />
+        <input type="password" id="mqttPassword" class="border rounded p-1" placeholder="MQTT Password (optional)" />
         <div class="flex flex-col gap-1" id="topicsArea">
           <div class="flex gap-2">
             <input type="text" class="topic-input w-full border rounded-md p-2" placeholder="MQTT Topic" />
@@ -436,7 +522,7 @@ function showDeviceRegisterForm() {
     generateDeviceId();
 }
 
-function addTopic() {
+window.addTopicRow = function() {
     const topicsArea = document.getElementById('topicsArea');
     const div = document.createElement('div');
     div.className = "flex gap-2";
@@ -451,10 +537,9 @@ function addTopic() {
 function cancelRegister() {
     const area = document.getElementById('floatingArea');
     area.innerHTML = `
-      <button id="addDeviceButton" onclick="showDeviceRegisterForm()" 
+      <button id="manageDeviceButton" onclick="showDeviceListModal()" 
               class="flex items-center justify-center gap-2 min-w-[140px] md:min-w-[160px] px-3 md:px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium text-base rounded-md transform hover:scale-105 transition-transform duration-200 shadow">
-        <span class="text-lg">+</span>
-        <span class="text-base">Add New Device</span>
+        Manage Device
       </button>
     `;
 }
@@ -468,10 +553,134 @@ function generateDeviceId() {
 }
 
 function logout() {
-    if (confirm('Are you sure you want to logout?')) {
-        localStorage.removeItem('loggedIn');
-        window.location.href = "index.html";
+    localStorage.removeItem('token');
+    window.location.href = 'index.html';
+}
+
+function showAccount() {
+    const modal = document.getElementById('account-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        
+        // Get user data from localStorage
+        const username = localStorage.getItem('username') || 'N/A';
+        const role = localStorage.getItem('userRole') || 'N/A';
+        
+        // Try to get email from userData if exists
+        let email = 'N/A';
+        try {
+            const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+            email = userData.email || 'N/A';
+        } catch (error) {
+            console.error('Error parsing userData:', error);
+        }
+        
+        // Populate the modal with user data
+        document.getElementById('username').value = username;
+        document.getElementById('email').value = email;
+        document.getElementById('role').value = role;
     }
+}
+
+function saveAccount() {
+    // Get updated values
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+    
+    // Basic validation
+    if (!username || !email) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    // Update localStorage with new values
+    localStorage.setItem('username', username);
+    
+    // Update userData object
+    let userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    userData.email = email;
+    localStorage.setItem('userData', JSON.stringify(userData));
+    
+    // Update the display
+    showAccount();
+    
+    // Close modal
+    document.getElementById('account-modal').classList.add('hidden');
+    
+    // Show success message
+    alert('Account information updated successfully!');
+}
+
+function changePassword() {
+    // Get password values
+    const currentPassword = document.getElementById('currentPassword').value.trim();
+    const newPassword = document.getElementById('newPassword').value.trim();
+    const confirmPassword = document.getElementById('confirmPassword').value.trim();
+    
+    // Basic validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        alert('Please fill in all password fields');
+        return;
+    }
+    
+
+    
+    // Password confirmation validation
+    if (newPassword !== confirmPassword) {
+        alert('New password and confirm password do not match');
+        return;
+    }
+    
+    // Get user ID from localStorage
+    const userId = localStorage.getItem('userId');
+    
+    // Make API call to change password
+    fetch('http://localhost:3001/change-password', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': localStorage.getItem('token')
+        },
+        body: JSON.stringify({
+            userId: userId,
+            currentPassword: currentPassword,
+            newPassword: newPassword
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Password change failed');
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Clear password fields
+        document.getElementById('currentPassword').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+        
+        // Show success message
+        alert('Password changed successfully!');
+    })
+    .catch(error => {
+        alert('Error changing password: ' + error.message);
+    });
+}
+
+function isValidPassword(password) {
+    // Password must be at least 8 characters long
+    if (password.length < 8) return false;
+    
+    // Password must contain at least one letter
+    if (!/[a-zA-Z]/.test(password)) return false;
+    
+    // Password must contain at least one number
+    if (!/[0-9]/.test(password)) return false;
+    
+    // Password must contain at least one special character
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) return false;
+    
+    return true;
 }
 
 function addTopic() {
@@ -489,6 +698,8 @@ function submitDevice() {
     const latlong = document.getElementById('latlong')?.value || '';
     const mqttIp = document.getElementById('mqttIp')?.value || '';
     const mqttPort = document.getElementById('mqttPort')?.value || '';
+    const mqttUsername = document.getElementById('mqttUsername')?.value || '';
+    const mqttPassword = document.getElementById('mqttPassword')?.value || '';
     // Ambil semua pasangan topic & keterangan
     const topicInputs = document.querySelectorAll('.topic-input');
     const ketInputs = document.querySelectorAll('.keterangan-input');
@@ -508,7 +719,7 @@ function submitDevice() {
     fetch('http://localhost:3001/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, latlong, mqttIp, mqttPort, topics })
+        body: JSON.stringify({ id, latlong, alamatLokasi, mqttIp, mqttPort, mqttUsername, mqttPassword, topics })
     })
     .then(res => res.json())
     .then(data => {
