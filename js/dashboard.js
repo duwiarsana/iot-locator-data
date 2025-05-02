@@ -1,3 +1,20 @@
+// --- Custom DivIcon untuk status marker ---
+window.getDelayDivIcon = function() {
+    return L.divIcon({
+        className: 'custom-delay-icon',
+        html: `<div style="width:22px;height:22px;background:#f00;border-radius:50%;border:2px solid #fff;"></div>`,
+        iconSize: [22,22],
+        iconAnchor: [11,11]
+    });
+};
+window.getOfflineDivIcon = function() {
+    return L.divIcon({
+        className: 'custom-offline-icon',
+        html: `<div style="width:22px;height:22px;background:#f00;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:16px;">×</div>`,
+        iconSize: [22,22],
+        iconAnchor: [11,11]
+    });
+};
 // Data sensor ditampung di object
 let sensorData = {
     id: "PDM1234", // ID Dummy
@@ -200,49 +217,55 @@ mqttClient.on('connect', () => {
 
 mqttClient.on('message', (topic, message) => {
     const payload = message.toString();
-
-    if (topic === 'sensor/tegangan') {
-        sensorData.tegungan = payload;
-        const el = document.getElementById('tegungan');
-        if (el) el.innerText = payload;
-        const popupEl = document.getElementById('tegunganPopup');
-        if (popupEl) popupEl.innerText = payload;
-    }
-    if (topic === 'sensor/arus') {
-        sensorData.arus = payload;
-        const el = document.getElementById('arus');
-        if (el) el.innerText = payload;
-        const popupEl = document.getElementById('arusPopup');
-        if (popupEl) popupEl.innerText = payload;
-    }
-    if (topic === 'sensor/daya') {
-        sensorData.daya = payload;
-        const el = document.getElementById('daya');
-        if (el) el.innerText = payload;
-        const popupEl = document.getElementById('dayaPopup');
-        if (popupEl) popupEl.innerText = payload;
-    }
-    if (topic === 'sensor/kwh') {
-        sensorData.kwh = payload;
-        const el = document.getElementById('kwh');
-        if (el) el.innerText = payload;
-        const popupEl = document.getElementById('kwhPopup');
-        if (popupEl) popupEl.innerText = payload;
-
-        sensorData.biaya = hitungBiaya(parseFloat(payload));
-        const biayaEl = document.getElementById('biaya');
-        if (biayaEl) biayaEl.innerText = Number(sensorData.biaya).toLocaleString('id-ID');
-        const popupBiayaEl = document.getElementById('biayaPopup');
-        if (popupBiayaEl) popupBiayaEl.innerText = Number(sensorData.biaya).toLocaleString('id-ID');
-    }
-    if (topic === 'sensor/pf') {
-        sensorData.pf = payload;
-        const el = document.getElementById('pf');
-        if (el) el.innerText = payload;
-        const popupEl = document.getElementById('pfPopup');
-        if (popupEl) popupEl.innerText = payload;
+    // Cari deviceId yang punya topik ini
+    const deviceId = window.deviceTopicMap && window.deviceTopicMap[topic];
+    if (deviceId && window.deviceMarkers && window.deviceMarkers[deviceId]) {
+        const { marker, device } = window.deviceMarkers[deviceId];
+        // Update lastUpdate setiap ada data masuk
+        device.lastUpdate = Date.now();
+        // Update liveData sesuai jenis topik
+        if (/tegangan/i.test(topic)) device.liveData.tegangan = payload;
+        if (/arus/i.test(topic)) device.liveData.arus = payload;
+        if (/daya/i.test(topic)) device.liveData.daya = payload;
+        if (/kwh/i.test(topic)) {
+            device.liveData.kwh = payload;
+            device.liveData.biaya = hitungBiaya(parseFloat(payload));
+        }
+        if (/pf/i.test(topic)) device.liveData.pf = payload;
+        // Jika popup terbuka, update popup
+        if (marker.isPopupOpen && marker.isPopupOpen()) {
+            marker.setPopupContent(window.renderDevicePopup(device));
+        }
     }
 });
+
+// --- Cek status data masuk setiap 5 detik, ubah marker jadi merah jika tidak ada data ---
+if (!window.statusIntervalSet) {
+    window.statusIntervalSet = true;
+    setInterval(() => {
+        const now = Date.now();
+        const THRESHOLD_RED = 10000; // 10 detik
+        const THRESHOLD_OFFLINE = 60000; // 1 menit
+        Object.values(window.deviceMarkers || {}).forEach(({ marker, device }) => {
+            if (!device.lastUpdate || now - device.lastUpdate > THRESHOLD_OFFLINE) {
+                // Lebih dari 1 menit: icon offline bulat X
+                if (marker.setIcon && window.getOfflineDivIcon) {
+                    marker.setIcon(window.getOfflineDivIcon());
+                }
+            } else if (now - device.lastUpdate > THRESHOLD_RED) {
+                // Lebih dari 10 detik tapi kurang dari 1 menit: icon bulat merah polos
+                if (marker.setIcon && window.getDelayDivIcon) {
+                    marker.setIcon(window.getDelayDivIcon());
+                }
+            } else {
+                // Data masuk normal: icon default
+                if (marker.setIcon && window.L && window.L.Icon && window.L.Icon.Default) {
+                    marker.setIcon(new window.L.Icon.Default());
+                }
+            }
+        });
+    }, 5000);
+}
 
 mqttClient.on('error', (err) => {
     console.error('MQTT Error:', err);
@@ -330,75 +353,113 @@ function initMap() {
         
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors',
+            attribution: ' OpenStreetMap contributors',
             maxZoom: 19
         }).addTo(map);
         
-        // Add marker
-        const marker = L.marker([-8.6773879009797, 115.22863462372545]).addTo(map);
-        
+        // Tidak ada marker dummy, semua marker diambil dari data backend
         // Force map to re-render
         map.invalidateSize();
         
-        // Safe value for biaya
-        let biayaDisplay = isNaN(Number(sensorData.biaya)) ? '-' : Number(sensorData.biaya).toLocaleString('id-ID');
+        // --- Tambah marker untuk semua device terdaftar dan siapkan mapping live MQTT ---
+        window.deviceMarkers = {};
+        window.deviceTopicMap = {};
+        fetch('http://localhost:3001/devices')
+            .then(res => res.json())
+            .then(devices => {
+                if (Array.isArray(devices)) {
+                    devices.forEach(device => {
+                        if (device.latlong && device.latlong.includes(',')) {
+                            const [lat, lng] = device.latlong.split(',').map(Number);
+                            if (!isNaN(lat) && !isNaN(lng)) {
+                                // Inisialisasi data live
+                                device.liveData = {
+                                    tegangan: '-', arus: '-', daya: '-', kwh: '-', pf: '-', biaya: '-'
+                                };
+                                const devMarker = L.marker([lat, lng]).addTo(map);
+                                devMarker.bindPopup(renderDevicePopup(device));
+                                // Tambahkan lastUpdate untuk status data
+                                const now = Date.now();
+                                device.lastUpdate = now;
+                                window.deviceMarkers[device.id] = { marker: devMarker, device };
+                                // Mappingkan semua topik milik device
+                                if (Array.isArray(device.topics)) {
+                                    device.topics.forEach(t => {
+                                        if (t.topic) {
+                                            window.deviceTopicMap[t.topic] = device.id;
+                                        }
+                                    });
+                                }
+                                // Update popup saat dibuka
+                                devMarker.on('popupopen', function() {
+                                    devMarker.setPopupContent(renderDevicePopup(device));
+                                });
+                            }
+                        }
+                    });
+                }
+            })
+            .catch(err => {
+                console.error('Gagal mengambil daftar device:', err);
+            });
 
-        // --- Hapus info-table di kanan atas, hanya tampilkan data di popup marker ---
-        // Create popup content
-        const popupContent = `
-            <div class="text-sm space-y-2">
-                <table class="w-full text-left">
-                    <tbody>
-                        <tr>
-                            <td class="pr-1 font-semibold">ID Device</td>
-                            <td class="px-1 font-semibold">:</td>
-                            <td><span id="idDevicePopup">${sensorData.id}</span></td>
-                        </tr>
-                        <tr>
-                            <td class="pr-1 font-semibold">Tegangan</td>
-                            <td class="px-1 font-semibold">:</td>
-                            <td><span id="teganganPopup">${sensorData.tegangan}</span> V</td>
-                        </tr>
-                        <tr>
-                            <td class="pr-1 font-semibold">Arus</td>
-                            <td class="px-1 font-semibold">:</td>
-                            <td><span id="arusPopup">${sensorData.arus}</span> A</td>
-                        </tr>
-                        <tr>
-                            <td class="pr-1 font-semibold">Daya Listrik</td>
-                            <td class="px-1 font-semibold">:</td>
-                            <td><span id="dayaPopup">${sensorData.daya}</span> Watt</td>
-                        </tr>
-                        <tr>
-                            <td class="pr-1 font-semibold">Kwh</td>
-                            <td class="px-1 font-semibold">:</td>
-                            <td><span id="kwhPopup">${sensorData.kwh}</span> kWh</td>
-                        </tr>
-                        <tr>
-                            <td class="pr-1 font-semibold">Power Factor</td>
-                            <td class="px-1 font-semibold">:</td>
-                            <td><span id="pfPopup">${sensorData.pf}</span></td>
-                        </tr>
-                        <tr>
-                            <td class="pr-1 font-semibold">Biaya</td>
-                            <td class="px-1 font-semibold">:</td>
-                            <td>Rp <span id="biayaPopup">${biayaDisplay}</span></td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="pt-2 mt-2 border-t text-xs text-gray-600">
-                    📍 Alamat : Jalan Tukad Yeh Aya 18x
+        // Fungsi render popup device
+        function renderDevicePopup(device) {
+            // Helper untuk ambil satuan dari topics
+            function getUnit(label) {
+                if (!device.topics) return '';
+                // Cari topic dengan keterangan yang cocok (case-insensitive)
+                const found = device.topics.find(t => t.keterangan && t.keterangan.toLowerCase().includes(label.toLowerCase()));
+                return found && found.unit ? found.unit : '';
+            }
+            return `
+                <div class="text-sm space-y-2">
+                    <table class="w-full text-left">
+                        <tbody>
+                            <tr>
+                                <td class="pr-1 font-semibold">ID Device</td>
+                                <td class="px-1 font-semibold">:</td>
+                                <td>${device.id || '-'}</td>
+                            </tr>
+                            <tr>
+                                <td class="pr-1 font-semibold">Tegangan</td>
+                                <td class="px-1 font-semibold">:</td>
+                                <td>${device.liveData?.tegangan || '-'}${getUnit('tegangan') ? ' ' + getUnit('tegangan') : ''}</td>
+                            </tr>
+                            <tr>
+                                <td class="pr-1 font-semibold">Arus</td>
+                                <td class="px-1 font-semibold">:</td>
+                                <td>${device.liveData?.arus || '-'}${getUnit('arus') ? ' ' + getUnit('arus') : ''}</td>
+                            </tr>
+                            <tr>
+                                <td class="pr-1 font-semibold">Daya Listrik</td>
+                                <td class="px-1 font-semibold">:</td>
+                                <td>${device.liveData?.daya || '-'}${getUnit('daya') ? ' ' + getUnit('daya') : ''}</td>
+                            </tr>
+                            <tr>
+                                <td class="pr-1 font-semibold">Kwh</td>
+                                <td class="px-1 font-semibold">:</td>
+                                <td>${device.liveData?.kwh || '-'}${getUnit('kwh') ? ' ' + getUnit('kwh') : ''}</td>
+                            </tr>
+                            <tr>
+                                <td class="pr-1 font-semibold">Power Factor</td>
+                                <td class="px-1 font-semibold">:</td>
+                                <td>${device.liveData?.pf || '-'}${getUnit('pf') ? ' ' + getUnit('pf') : ''}</td>
+                            </tr>
+                            <tr>
+                                <td class="pr-1 font-semibold">Biaya</td>
+                                <td class="px-1 font-semibold">:</td>
+                                <td>Rp ${device.liveData?.biaya !== '-' ? Number(device.liveData.biaya).toLocaleString('id-ID') : '-'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="pt-2 mt-2 border-t text-xs text-gray-600">
+                        📍 Alamat : ${device.alamatLokasi || '-'}
+                    </div>
                 </div>
-            </div>
-        `;
-
-        // Set popup content
-        marker.bindPopup(popupContent);
-
-        // Add click handler for popup
-        marker.on('click', function() {
-            marker.openPopup();
-        });
+            `;
+        }
+        window.renderDevicePopup = renderDevicePopup;
 
         console.log('Map initialized successfully');
         
@@ -420,10 +481,12 @@ window.submitEditDevice = function(id) {
     // Ambil semua pasangan topic & keterangan
     const topicInputs = document.querySelectorAll('.topic-input');
     const ketInputs = document.querySelectorAll('.keterangan-input');
+    const unitInputs = document.querySelectorAll('.unit-input');
     const topics = Array.from(topicInputs).map((input, i) => {
         return {
             topic: input.value,
-            keterangan: ketInputs[i]?.value || ''
+            keterangan: ketInputs[i]?.value || '',
+            unit: unitInputs[i]?.value || ''
         };
     }).filter(t => t.topic);
 
@@ -472,7 +535,8 @@ window.editDevice = function(id) {
                   ${(device.topics||[]).map((t,i) => `
                     <div class='flex gap-2'>
                       <input type='text' class='topic-input w-full border rounded-md p-2' placeholder='MQTT Topic' value='${t.topic||''}' />
-                      <input type='text' class='keterangan-input w-full border rounded-md p-2' placeholder='Keterangan' value='${t.keterangan||''}' />
+<input type='text' class='keterangan-input w-full border rounded-md p-2' placeholder='Keterangan' value='${t.keterangan||''}' />
+<input type='text' class='unit-input w-16 border rounded-md p-2' placeholder='Satuan' value='${t.unit||''}' />
                       <button type='button' onclick='this.parentNode.remove()' class='bg-red-500 text-white px-3 py-1 rounded'>-</button>
                     </div>
                   `).join('')}
@@ -510,6 +574,7 @@ function showDeviceRegisterForm() {
           <div class="flex gap-2">
             <input type="text" class="topic-input w-full border rounded-md p-2" placeholder="MQTT Topic" />
             <input type="text" class="keterangan-input w-full border rounded-md p-2" placeholder="Keterangan" />
+            <input type="text" class="unit-input w-16 border rounded-md p-2" placeholder="Satuan" />
             <button type="button" onclick="addTopic()" class="bg-green-500 text-white px-3 py-1 rounded">+</button>
           </div>
         </div>
@@ -526,11 +591,12 @@ window.addTopicRow = function() {
     const topicsArea = document.getElementById('topicsArea');
     const div = document.createElement('div');
     div.className = "flex gap-2";
-    div.innerHTML = `
-      <input type="text" class="topic-input w-full border rounded-md p-2" placeholder="MQTT Topic" />
-      <input type="text" class="keterangan-input w-full border rounded-md p-2" placeholder="Keterangan" />
-      <button type="button" onclick="this.parentNode.remove()" class="bg-red-500 text-white px-3 py-1 rounded">-</button>
-    `;
+div.innerHTML = `
+  <input type="text" class="topic-input w-full border rounded-md p-2" placeholder="MQTT Topic" />
+  <input type="text" class="keterangan-input w-full border rounded-md p-2" placeholder="Keterangan" />
+  <input type="text" class="unit-input w-16 border rounded-md p-2" placeholder="Satuan" />
+  <button type="button" onclick="this.parentNode.remove()" class="bg-red-500 text-white px-3 py-1 rounded">-</button>
+`;
     topicsArea.appendChild(div);
 }
 
@@ -703,10 +769,12 @@ function submitDevice() {
     // Ambil semua pasangan topic & keterangan
     const topicInputs = document.querySelectorAll('.topic-input');
     const ketInputs = document.querySelectorAll('.keterangan-input');
+    const unitInputs = document.querySelectorAll('.unit-input');
     const topics = Array.from(topicInputs).map((input, i) => {
         return {
             topic: input.value,
-            keterangan: ketInputs[i]?.value || ''
+            keterangan: ketInputs[i]?.value || '',
+            unit: unitInputs[i]?.value || ''
         };
     }).filter(t => t.topic);
 
