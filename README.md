@@ -31,6 +31,14 @@ A web-based IoT device management system that tracks and monitors IoT devices us
 └── user-management.html # User management interface
 ```
 
+## Update Log (May 2025)
+
+- Fixed bug where device address (alamatLokasi) could appear as `[object Object]`.
+- Backend now always stores `alamatLokasi` as a string, never as an object.
+- Frontend now reliably sends the correct string value for device address.
+- Device list UI: device address is now displayed with a location pin (📍) and normal font style (not italic).
+- Improved reliability for device registration and editing flows.
+
 ## Prerequisites
 
 - Node.js (v14 or higher)
