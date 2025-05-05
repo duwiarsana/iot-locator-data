@@ -7,6 +7,30 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    .device-id-tooltip {
+      background-color: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #333;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .device-id-tooltip:before {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: 50%;
+      margin-left: -5px;
+      border-width: 5px 5px 0;
+      border-style: solid;
+      border-color: white transparent transparent;
+    }
+  </style>
 </head>
 <body class="min-h-screen bg-gray-50">
   <div id="dashboard" class="min-h-screen hidden">

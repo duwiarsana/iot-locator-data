@@ -33,11 +33,21 @@ A web-based IoT device management system that tracks and monitors IoT devices us
 
 ## Update Log (May 2025)
 
-- Fixed bug where device address (alamatLokasi) could appear as `[object Object]`.
-- Backend now always stores `alamatLokasi` as a string, never as an object.
-- Frontend now reliably sends the correct string value for device address.
-- Device list UI: device address is now displayed with a location pin (📍) and normal font style (not italic).
-- Improved reliability for device registration and editing flows.
+### Latest Updates
+
+- Added device ID display as tooltips on map markers for better device identification
+- Implemented MQTT data handling to maintain previous valid sensor values when receiving NaN
+- Improved map marker styling for better visibility
+- Enhanced MQTT message handling for more reliable data display
+- Fixed issue with NaN values in sensor data causing display problems
+
+### Previous Updates
+
+- Fixed bug where device address (alamatLokasi) could appear as `[object Object]`
+- Backend now always stores `alamatLokasi` as a string, never as an object
+- Frontend now reliably sends the correct string value for device address
+- Device list UI: device address is now displayed with a location pin (📍) and normal font style (not italic)
+- Improved reliability for device registration and editing flows
 
 ## Prerequisites
 

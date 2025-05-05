@@ -215,6 +215,9 @@ mqttClient.on('connect', () => {
     mqttClient.subscribe('sensor/pf');
 });
 
+// Store previous valid values
+const previousValues = {};
+
 mqttClient.on('message', (topic, message) => {
     const payload = message.toString();
     // Cari deviceId yang punya topik ini
@@ -223,15 +226,53 @@ mqttClient.on('message', (topic, message) => {
         const { marker, device } = window.deviceMarkers[deviceId];
         // Update lastUpdate setiap ada data masuk
         device.lastUpdate = Date.now();
-        // Update liveData sesuai jenis topik
-        if (/tegangan/i.test(topic)) device.liveData.tegangan = payload;
-        if (/arus/i.test(topic)) device.liveData.arus = payload;
-        if (/daya/i.test(topic)) device.liveData.daya = payload;
-        if (/kwh/i.test(topic)) {
-            device.liveData.kwh = payload;
-            device.liveData.biaya = hitungBiaya(parseFloat(payload));
+        
+        // Initialize previousValues for this device if not exists
+        if (!previousValues[deviceId]) {
+            previousValues[deviceId] = {
+                tegangan: "-",
+                arus: "-",
+                daya: "-",
+                kwh: "-",
+                pf: "-",
+                biaya: "-"
+            };
         }
-        if (/pf/i.test(topic)) device.liveData.pf = payload;
+        
+        // Update liveData sesuai jenis topik, handle NaN values
+        if (/tegangan/i.test(topic)) {
+            const value = parseFloat(payload);
+            device.liveData.tegangan = isNaN(value) ? previousValues[deviceId].tegangan : payload;
+            previousValues[deviceId].tegangan = device.liveData.tegangan;
+        }
+        if (/arus/i.test(topic)) {
+            const value = parseFloat(payload);
+            device.liveData.arus = isNaN(value) ? previousValues[deviceId].arus : payload;
+            previousValues[deviceId].arus = device.liveData.arus;
+        }
+        if (/daya/i.test(topic)) {
+            const value = parseFloat(payload);
+            device.liveData.daya = isNaN(value) ? previousValues[deviceId].daya : payload;
+            previousValues[deviceId].daya = device.liveData.daya;
+        }
+        if (/kwh/i.test(topic)) {
+            const value = parseFloat(payload);
+            if (!isNaN(value)) {
+                device.liveData.kwh = payload;
+                device.liveData.biaya = hitungBiaya(value);
+                previousValues[deviceId].kwh = device.liveData.kwh;
+                previousValues[deviceId].biaya = device.liveData.biaya;
+            } else {
+                device.liveData.kwh = previousValues[deviceId].kwh;
+                device.liveData.biaya = previousValues[deviceId].biaya;
+            }
+        }
+        if (/pf/i.test(topic)) {
+            const value = parseFloat(payload);
+            device.liveData.pf = isNaN(value) ? previousValues[deviceId].pf : payload;
+            previousValues[deviceId].pf = device.liveData.pf;
+        }
+        
         // Jika popup terbuka, update popup
         if (marker.isPopupOpen && marker.isPopupOpen()) {
             marker.setPopupContent(window.renderDevicePopup(device));
@@ -376,8 +417,16 @@ function initMap() {
                                 device.liveData = {
                                     tegangan: '-', arus: '-', daya: '-', kwh: '-', pf: '-', biaya: '-'
                                 };
-                                const devMarker = L.marker([lat, lng]).addTo(map);
+                                const devMarker = L.marker([lat, lng], {
+                                    title: device.id
+                                }).addTo(map);
                                 devMarker.bindPopup(renderDevicePopup(device));
+                                devMarker.bindTooltip(device.id, {
+                                    permanent: true,
+                                    direction: 'top',
+                                    offset: [0, -10],
+                                    className: 'device-id-tooltip'
+                                });
                                 // Tambahkan lastUpdate untuk status data
                                 const now = Date.now();
                                 device.lastUpdate = now;
