@@ -1,136 +1,136 @@
-# IoT Locator Data
+# Data IoT Locator
 
-A web-based IoT device management system that tracks and monitors IoT devices using MQTT protocol and displays their location on a map.
+Sistem manajemen perangkat IoT berbasis web yang melacak dan memantau perangkat IoT menggunakan protokol MQTT dan menampilkan lokasinya pada peta.
 
-## Features
+## Fitur
 
-- User Management System
-  - Admin login
-  - User registration
-  - Role-based access control
+- Sistem Manajemen Pengguna
+  - Login Admin
+  - Registrasi Pengguna
+  - Kontrol akses berbasis peran
 
-- Device Management
-  - Add new IoT devices
-  - Configure MQTT settings
-  - Multiple topic subscriptions with descriptions
-  - Device location tracking
+- Manajemen Perangkat
+  - Tambah perangkat IoT baru
+  - Konfigurasi pengaturan MQTT
+  - Langganan beberapa topik dengan deskripsi
+  - Pelacakan lokasi perangkat
 
-- Real-time Monitoring
-  - Live sensor data display
-  - Map-based device visualization
-  - Interactive device information
+- Pemantauan Real-time
+  - Tampilan data sensor langsung
+  - Visualisasi perangkat berbasis peta
+  - Informasi perangkat interaktif
 
-## Project Structure
+## Struktur Proyek
 
 ```
 .
-├── backend/           # Node.js backend server
-├── js/               # Frontend JavaScript files
-├── dashboard.html    # Main dashboard interface
-├── index.html        # Login page
-└── user-management.html # User management interface
+├── backend/           # Server backend Node.js
+├── js/               # File JavaScript frontend
+├── dashboard.html    # Antarmuka dasbor utama
+├── index.html        # Halaman login
+└── user-management.html # Antarmuka manajemen pengguna
 ```
 
-## Update Log (May 2025)
+## Catatan Pembaruan (Mei 2025)
 
-### Latest Updates
+### Pembaruan Terbaru
 
-- Added device ID display as tooltips on map markers for better device identification
-- Implemented MQTT data handling to maintain previous valid sensor values when receiving NaN
-- Improved map marker styling for better visibility
-- Enhanced MQTT message handling for more reliable data display
-- Fixed issue with NaN values in sensor data causing display problems
+- Menambahkan tampilan ID perangkat sebagai tooltip pada penanda peta untuk identifikasi perangkat yang lebih baik
+- Mengimplementasikan penanganan data MQTT untuk mempertahankan nilai sensor valid sebelumnya ketika menerima NaN
+- Meningkatkan gaya penanda peta untuk visibilitas yang lebih baik
+- Meningkatkan penanganan pesan MQTT untuk tampilan data yang lebih andal
+- Memperbaiki masalah dengan nilai NaN dalam data sensor yang menyebabkan masalah tampilan
 
-### Previous Updates
+### Pembaruan Sebelumnya
 
-- Fixed bug where device address (alamatLokasi) could appear as `[object Object]`
-- Backend now always stores `alamatLokasi` as a string, never as an object
-- Frontend now reliably sends the correct string value for device address
-- Device list UI: device address is now displayed with a location pin (📍) and normal font style (not italic)
-- Improved reliability for device registration and editing flows
+- Memperbaiki bug di mana alamat perangkat (alamatLokasi) dapat muncul sebagai `[object Object]`
+- Backend sekarang selalu menyimpan `alamatLokasi` sebagai string, tidak pernah sebagai objek
+- Frontend sekarang secara andal mengirimkan nilai string yang benar untuk alamat perangkat
+- UI daftar perangkat: alamat perangkat sekarang ditampilkan dengan pin lokasi (📍) dan gaya font normal (tidak miring)
+- Meningkatkan keandalan alur registrasi dan pengeditan perangkat
 
-## Prerequisites
+## Prasyarat
 
-- Node.js (v14 or higher)
+- Node.js (v14 atau lebih tinggi)
 - npm (Node Package Manager)
-- MQTT Broker (e.g., Mosquitto)
-- Web browser (Chrome recommended)
+- Broker MQTT (misalnya, Mosquitto)
+- Peramban web (Chrome disarankan)
 
-## Installation
+## Instalasi
 
-1. Clone the repository:
+1. Klon repository:
    ```bash
    git clone https://github.com/duwiarsana/iot-locator-data.git
    cd iot-locator-data
    ```
 
-2. Install backend dependencies:
+2. Instal dependensi backend:
    ```bash
    cd backend
    npm install
    ```
 
-3. Start the backend server:
+3. Jalankan server backend:
    ```bash
    node server.js
    ```
 
-4. Open your web browser and navigate to:
-   - Login page: `http://localhost:3000`
-   - Dashboard: `http://localhost:3000/dashboard`
-   - User Management: `http://localhost:3000/user-management`
+4. Buka peramban web dan navigasikan ke:
+   - Halaman login: `http://localhost:3000`
+   - Dasbor: `http://localhost:3000/dashboard`
+   - Manajemen pengguna: `http://localhost:3000/user-management`
 
-## Usage
+## Penggunaan
 
 1. **Login**
-   - Access the login page at `http://localhost:3000`
-   - Use admin credentials to log in
+   - Akses halaman login di `http://localhost:3000`
+   - Gunakan kredensial admin untuk login
 
-2. **Device Registration**
-   - Click "Add New Device" in the dashboard
-   - Fill in device details:
-     - Device ID
-     - MQTT IP and Port
-     - Location coordinates (latitude, longitude)
-     - Add multiple MQTT topics with descriptions
-   - Click "Register" to save the device
+2. **Pendaftaran Perangkat**
+   - Klik "Tambah Perangkat Baru" di dasbor
+   - Isi detail perangkat:
+     - ID perangkat
+     - IP dan port MQTT
+     - Koordinat lokasi (latitude, longitude)
+     - Tambahkan beberapa topik MQTT dengan deskripsi
+   - Klik "Daftar" untuk menyimpan perangkat
 
-3. **Monitoring**
-   - View devices on the map
-   - Click on markers to see detailed information
-   - Real-time sensor data updates
-   - Device location tracking
+3. **Pemantauan**
+   - Lihat perangkat di peta
+   - Klik pada penanda untuk melihat informasi detail
+   - Perbaruan data sensor real-time
+   - Pelacakan lokasi perangkat
 
-## Configuration
+## Konfigurasi
 
-### Backend Configuration
+### Konfigurasi Backend
 
-The backend server uses a SQLite database for user management and device settings. The configuration is handled in `backend/server.js`.
+Server backend menggunakan database SQLite untuk manajemen pengguna dan pengaturan perangkat. Konfigurasi diatur di `backend/server.js`.
 
-### MQTT Configuration
+### Konfigurasi MQTT
 
-Devices connect to the MQTT broker using the configured IP and port. The backend server subscribes to the configured topics to receive sensor data.
+Perangkat terhubung ke broker MQTT menggunakan IP dan port yang dikonfigurasi. Server backend berlangganan ke topik yang dikonfigurasi untuk menerima data sensor.
 
-## Security
+## Keamanan
 
-- Passwords are hashed before storage
-- Admin-only access to device registration and user management
-- Secure session management
+- Kata sandi di-hash sebelum disimpan
+- Akses hanya untuk admin untuk pendaftaran perangkat dan manajemen pengguna
+- Manajemen sesi yang aman
 
-## Contributing
+## Kontribusi
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+1. Fork repository
+2. Buat cabang fitur Anda (`git checkout -b feature/FiturMenakjubkan`)
+3. Commit perubahan Anda (`git commit -m 'Menambahkan beberapa FiturMenakjubkan'`)
+4. Push ke cabang (`git push origin feature/FiturMenakjubkan`)
+5. Buka Pull Request
 
-## License
+## Lisensi
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Proyek ini dilisensikan di bawah Lisensi MIT - lihat file LICENSE untuk detailnya.
 
-## Acknowledgments
+## Penghargaan
 
-- Leaflet.js for map visualization
-- MQTT.js for MQTT protocol implementation
-- Tailwind CSS for styling
+- Leaflet.js untuk visualisasi peta
+- MQTT.js untuk implementasi protokol MQTT
+- Tailwind CSS untuk styling

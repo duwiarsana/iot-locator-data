@@ -1,48 +1,49 @@
-# Changelog
+# Catatan Perubahan
 
-All notable changes to this project will be documented in this file.
+Semua perubahan penting pada proyek ini akan didokumentasikan dalam file ini.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Format ini didasarkan pada [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+dan proyek ini mematuhi [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Belum Dirilis]
 
-### Added
+### Ditambahkan
 
-- Device ID display as tooltips on map markers for better device identification
-- MQTT data handling to maintain previous valid sensor values when receiving NaN
+- Tampilan ID perangkat sebagai tooltip pada penanda peta untuk identifikasi perangkat yang lebih baik
+- Penanganan data MQTT untuk mempertahankan nilai sensor valid sebelumnya ketika menerima NaN
 
-### Changed
+### Diubah
 
-- Improved map marker styling for better visibility
-- Enhanced MQTT message handling for more reliable data display
-- Updated dependencies to latest versions
-- Improved UI/UX design with Tailwind CSS
+- Menerjemahkan README.md dan CHANGELOG.md ke Bahasa Indonesia
+- Meningkatkan gaya penanda peta untuk visibilitas yang lebih baik
+- Meningkatkan penanganan pesan MQTT untuk tampilan data yang lebih andal
+- Memperbarui dependensi ke versi terbaru
+- Meningkatkan desain UI/UX dengan Tailwind CSS
 
-### Fixed
+### Diperbaiki
 
-- Issue with NaN values in sensor data causing display problems
-- Map marker tooltips now properly show device IDs at all times
-- Initial bug fixes and optimizations
+- Masalah dengan nilai NaN dalam data sensor yang menyebabkan masalah tampilan
+- Tooltip penanda peta sekarang dengan benar menampilkan ID perangkat setiap saat
+- Perbaikan bug dan optimasi awal
 
 ## [1.0.0] - 2025-05-04
 
-### Added
+### Ditambahkan
 
-- Initial project setup
-- Backend server with Express.js
-- User management system
-- Device tracking functionality
-- Frontend dashboard with map visualization
+- Pengaturan proyek awal
+- Server backend dengan Express.js
+- Sistem manajemen pengguna
+- Fungsionalitas pelacakan perangkat
+- Dasbor frontend dengan visualisasi peta
 
-### Changed
+### Diubah
 
-- Set up project structure
-- Configured development environment
+- Menyiapkan struktur proyek
+- Mengkonfigurasi lingkungan pengembangan
 
-### Resolved
+### Diselesaikan
 
-- Initial setup issues
+- Masalah pengaturan awal
 
-[Unreleased]: https://github.com/duwiarsana/iot-locator-data/compare/v1.0.0...HEAD
+[Belum Dirilis]: https://github.com/duwiarsana/iot-locator-data/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/duwiarsana/iot-locator-data/releases/tag/v1.0.0
