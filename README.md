@@ -132,12 +132,30 @@ Perangkat terhubung ke broker MQTT menggunakan IP dan port yang dikonfigurasi. S
 4. Push ke cabang (`git push origin feature/FiturMenakjubkan`)
 5. Buka Pull Request
 
+## Hardware
+
+Bagian hardware untuk proyek ini akan segera tersedia! File desain PCB, skematik rangkaian, dan kode mikrokontroler (firmware) akan diunggah dan diupdate secepatnya agar dapat digunakan dan direplikasi oleh siapa saja.
+
+Pantau repository ini secara berkala untuk mendapatkan update terbaru mengenai hardware.
+
 ## Lisensi
 
 Proyek ini dilisensikan di bawah Lisensi MIT - lihat file LICENSE untuk detailnya.
 
-## Penghargaan
+## Terima Kasih Kepada
 
 - Leaflet.js untuk visualisasi peta
 - MQTT.js untuk implementasi protokol MQTT
 - Tailwind CSS untuk styling
+
+---
+
+## Dukung Proyek Ini
+
+Proyek ini dikembangkan secara open source dan gratis untuk siapa saja. Jika Anda merasa terbantu atau ingin mendukung pengembangan lebih lanjut, Anda bisa memberikan donasi melalui Saweria berikut:
+
+<p align="center">
+  <a href="https://saweria.co/duwiarsana" target="_blank" style="display:inline-block; background:#FFB800; color:#222; font-weight:bold; padding:12px 28px; border-radius:8px; text-decoration:none; font-size:1.15em;">💛 Dukung Lewat Saweria</a>
+</p>
+
+Setiap dukungan Anda sangat berarti untuk keberlanjutan dan pengembangan fitur baru pada proyek ini. Terima kasih banyak! 🙏
