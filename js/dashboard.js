@@ -800,10 +800,27 @@ function isValidPassword(password) {
 
 function addTopic() {
     const topicsArea = document.getElementById('topicsArea');
+    // Ambil semua input terakhir
+    const lastTopic = topicsArea.querySelector('.topic-input:last-of-type');
+    const lastKet = topicsArea.querySelector('.keterangan-input:last-of-type');
+    const lastUnit = topicsArea.querySelector('.unit-input:last-of-type');
+
+    // Jika sudah ada baris, cek validasi sebelum tambah baru
+    if (lastTopic && lastKet && lastUnit) {
+        if (!lastTopic.value.trim() || !lastKet.value.trim() || !lastUnit.value.trim()) {
+            alert('Isi semua kolom (MQTT Topic, Keterangan, dan Satuan) sebelum menambah baris baru!');
+            return;
+        }
+    }
+
+    // Buat baris baru
     const div = document.createElement('div');
-    div.className = "flex gap-2";
+    div.className = "flex gap-2 mb-2";
     div.innerHTML = `
-      <input type="text" class="topic-input w-full border rounded-md p-2" placeholder="new/topic">
+      <input type="text" class="topic-input w-full border rounded-md p-2" placeholder="MQTT Topic">
+      <input type="text" class="keterangan-input w-full border rounded-md p-2" placeholder="Keterangan">
+      <input type="text" class="unit-input w-16 border rounded-md p-2" placeholder="Satuan">
+      <button type="button" onclick="this.parentNode.remove()" class="bg-red-500 text-white px-3 py-1 rounded">-</button>
     `;
     topicsArea.appendChild(div);
 }

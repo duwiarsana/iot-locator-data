@@ -8,9 +8,14 @@ dan proyek ini mematuhi [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## [Belum Dirilis]
 
 ### Ditambahkan
+- Validasi input pada penambahan topic di form registrasi perangkat (semua kolom wajib diisi sebelum tambah baris baru)
 
-- Tampilan ID perangkat sebagai tooltip pada penanda peta untuk identifikasi perangkat yang lebih baik
-- Penanganan data MQTT untuk mempertahankan nilai sensor valid sebelumnya ketika menerima NaN
+### Diubah
+- Penyederhanaan dan pembersihan bagian Screenshots Dashboard di README.md
+- Instruksi penambahan screenshot di README.md diperjelas agar gambar tampil dengan benar
+
+### Diperbaiki
+- Perbaikan agar input topic, keterangan, dan satuan pada form tambah topic tidak bisa kosong
 
 ### Diubah
 

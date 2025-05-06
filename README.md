@@ -99,7 +99,14 @@ Sistem manajemen perangkat IoT berbasis web yang melacak dan memantau perangkat 
    - Lihat perangkat di peta
    - Klik pada penanda untuk melihat informasi detail
    - Perbaruan data sensor real-time
-   - Pelacakan lokasi perangkat
+
+## Screenshots Dashboard
+
+![Dashboard Data Screenshot](screenshots/dashboard.png)
+
+Tampilan dashboard utama yang menampilkan perangkat IoT beserta data sensor secara real-time pada peta interaktif.
+
+
 
 ## Konfigurasi
 
