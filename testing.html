@@ -310,6 +310,9 @@
       }
     }
 
+    // Global MQTT client variable
+    let globalMqttClient = null;
+    
     // Initialize MQTT connection
     function initMqttConnection() {
       // MQTT client configuration
@@ -318,9 +321,9 @@
         reconnectPeriod: 1000,  // Reconnect lebih cepat (1 detik)
         username: 'duwiarsana',
         password: 'Duwiarsana1234!?',
-        clientId: 'testing_dashboard_' + Math.random().toString(16).substr(2, 8),
-        keepalive: 30,  // Keepalive lebih pendek (30 detik)
-        clean: false,   // Gunakan persistent session
+        clientId: 'testing_dashboard_' + Math.random().toString(16).substr(2, 8) + '_' + Date.now(),
+        keepalive: 15,  // Keepalive lebih pendek (15 detik)
+        clean: true,    // Gunakan clean session untuk menghindari masalah
         resubscribe: true // Selalu resubscribe saat reconnect
       };
 
@@ -329,17 +332,27 @@
       document.getElementById('mqtt-connection-status').style.color = 'orange';
       
       try {
+        // Tutup koneksi yang ada jika masih ada
+        if (globalMqttClient && globalMqttClient.connected) {
+          console.log('Menutup koneksi MQTT yang ada sebelum membuat koneksi baru');
+          try {
+            globalMqttClient.end(true);
+          } catch (e) {
+            console.error('Error menutup koneksi yang ada:', e);
+          }
+        }
+        
         // Initialize MQTT client
-        const mqttClient = mqtt.connect('wss://1115a4b6fe5c40e588a3a85468f3c8be.s1.eu.hivemq.cloud:8884/mqtt', mqttConfig);
+        globalMqttClient = mqtt.connect('wss://1115a4b6fe5c40e588a3a85468f3c8be.s1.eu.hivemq.cloud:8884/mqtt', mqttConfig);
 
         // MQTT event handlers
-        mqttClient.on('connect', () => {
+        globalMqttClient.on('connect', () => {
           console.log('MQTT Connected at ' + new Date().toLocaleTimeString());
           document.getElementById('mqtt-connection-status').textContent = 'Connected';
           document.getElementById('mqtt-connection-status').style.color = 'green';
           
           // Subscribe to all topics
-          mqttClient.subscribe('#', {qos: 1}, (err) => {
+          globalMqttClient.subscribe('#', {qos: 1}, (err) => {
             if (err) {
               console.error('Error subscribing to all topics:', err);
             } else {
@@ -350,7 +363,7 @@
           // Also subscribe to specific topics with QoS 1
           const specificTopics = ['sensor/tegangan', 'sensor/arus', 'sensor/daya', 'sensor/kwh', 'sensor/pf'];
           specificTopics.forEach(topic => {
-            mqttClient.subscribe(topic, {qos: 1}, (err) => {
+            globalMqttClient.subscribe(topic, {qos: 1}, (err) => {
               if (err) {
                 console.error(`Error subscribing to ${topic}:`, err);
               } else {
@@ -362,7 +375,7 @@
           // Subscribe to all topics from devices
           const topics = [];
           for (const topic in deviceTopicMap) {
-            mqttClient.subscribe(topic, {qos: 1});
+            globalMqttClient.subscribe(topic, {qos: 1});
             console.log(`Subscribed to topic: ${topic}`);
             topics.push(topic);
           }
@@ -371,10 +384,10 @@
             specificTopics.join('<br>') + '<br>#';
             
           // Publish test message to verify connection
-          mqttClient.publish('test/connection', 'Dashboard connected at ' + new Date().toLocaleTimeString(), {qos: 1});
+          globalMqttClient.publish('test/connection', 'Dashboard connected at ' + new Date().toLocaleTimeString(), {qos: 1});
         });
 
-        mqttClient.on('message', (topic, message) => {
+        globalMqttClient.on('message', (topic, message) => {
           const payload = message.toString();
           const timestamp = new Date().toLocaleTimeString();
           console.log(`[${timestamp}] MQTT message received: ${topic} = ${payload}`);
@@ -449,40 +462,42 @@
           }
         });
 
-        mqttClient.on('error', (err) => {
+        globalMqttClient.on('error', (err) => {
           console.error('MQTT Error:', err);
-          document.getElementById('mqtt-connection-status').textContent = 'Error: ' + err.message;
-          document.getElementById('mqtt-connection-status').style.color = 'red';
+          console.log('MQTT Error at ' + new Date().toLocaleTimeString() + ':', err.message);
         });
         
-        mqttClient.on('offline', () => {
+        globalMqttClient.on('offline', () => {
           console.log('MQTT Client Offline at ' + new Date().toLocaleTimeString());
-          document.getElementById('mqtt-connection-status').textContent = 'Offline';
-          document.getElementById('mqtt-connection-status').style.color = 'orange';
         });
         
-        mqttClient.on('reconnect', () => {
+        globalMqttClient.on('reconnect', () => {
           console.log('MQTT Reconnecting at ' + new Date().toLocaleTimeString());
-          document.getElementById('mqtt-connection-status').textContent = 'Reconnecting...';
-          document.getElementById('mqtt-connection-status').style.color = 'orange';
         });
         
-        mqttClient.on('disconnect', () => {
+        globalMqttClient.on('disconnect', () => {
           console.log('MQTT Disconnected at ' + new Date().toLocaleTimeString());
-          document.getElementById('mqtt-connection-status').textContent = 'Disconnected';
-          document.getElementById('mqtt-connection-status').style.color = 'red';
         });
         
-        // Ping the MQTT connection every 10 seconds to keep it alive
+        // Ping the MQTT connection every 5 seconds to keep it alive
         setInterval(() => {
-          if (mqttClient.connected) {
+          if (globalMqttClient && globalMqttClient.connected) {
             console.log('Pinging MQTT connection at ' + new Date().toLocaleTimeString());
-            mqttClient.publish('test/ping', 'ping', {qos: 1});
-          } else {
+            globalMqttClient.publish('test/ping', 'ping', {qos: 1});
+          } else if (globalMqttClient) {
             console.log('MQTT not connected, attempting to reconnect...');
-            mqttClient.reconnect();
+            try {
+              globalMqttClient.reconnect();
+            } catch (e) {
+              console.error('Error during reconnect:', e);
+              // Reinitialize connection
+              initMqttConnection();
+            }
+          } else {
+            console.log('MQTT client not initialized, initializing...');
+            initMqttConnection();
           }
-        }, 10000);
+        }, 5000);
         
         // Tambahkan watchdog timer untuk memantau aktivitas MQTT
         let lastMessageTime = Date.now();
@@ -491,26 +506,34 @@
           const timeSinceLastMessage = now - lastMessageTime;
           console.log(`Time since last message: ${timeSinceLastMessage/1000} seconds`);
           
-          // Jika tidak ada pesan selama 30 detik, coba reconnect
-          if (timeSinceLastMessage > 30000) {
-            console.log('No messages received for 30 seconds, attempting to reconnect...');
+          // Jika tidak ada pesan selama 15 detik, coba reconnect
+          if (timeSinceLastMessage > 15000) {
+            console.log('No messages received for 15 seconds, attempting to reconnect...');
             try {
-              mqttClient.end(true); // Force disconnect
-              setTimeout(() => {
-                mqttClient.reconnect();
-              }, 1000);
+              if (globalMqttClient) {
+                globalMqttClient.end(true); // Force disconnect
+                console.log('Forced disconnect, reinitializing connection...');
+                // Reinitialize completely after a short delay
+                setTimeout(() => {
+                  initMqttConnection();
+                }, 1000);
+              } else {
+                initMqttConnection();
+              }
               lastMessageTime = now; // Reset timer
             } catch (error) {
               console.error('Error during reconnect:', error);
+              // Try to reinitialize anyway
+              setTimeout(initMqttConnection, 2000);
             }
           }
-        }, 15000);
+        }, 10000);
         
-        return mqttClient;
+        return globalMqttClient;
       } catch (error) {
         console.error('Error connecting to MQTT:', error);
-        document.getElementById('mqtt-connection-status').textContent = 'Connection Error';
-        document.getElementById('mqtt-connection-status').className = 'status-disconnected';
+        // Coba lagi setelah beberapa detik
+        setTimeout(initMqttConnection, 5000);
       }
     }
 
