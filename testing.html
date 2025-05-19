@@ -315,12 +315,13 @@
       // MQTT client configuration
       const mqttConfig = {
         connectTimeout: 4000,
-        reconnectPeriod: 2000,  
+        reconnectPeriod: 1000,  // Reconnect lebih cepat (1 detik)
         username: 'duwiarsana',
         password: 'Duwiarsana1234!?',
         clientId: 'testing_dashboard_' + Math.random().toString(16).substr(2, 8),
-        keepalive: 60,  
-        clean: true     
+        keepalive: 30,  // Keepalive lebih pendek (30 detik)
+        clean: false,   // Gunakan persistent session
+        resubscribe: true // Selalu resubscribe saat reconnect
       };
 
       console.log('Initializing MQTT connection...');
@@ -378,7 +379,7 @@
           const timestamp = new Date().toLocaleTimeString();
           console.log(`[${timestamp}] MQTT message received: ${topic} = ${payload}`);
           messageCount++;
-          document.getElementById('mqtt-messages').textContent = `Messages received: ${messageCount} (Last: ${timestamp})`;
+          lastMessageTime = Date.now(); // Update timestamp terakhir kali pesan diterima
           
           // Find device ID that has this topic
           const deviceId = deviceTopicMap[topic];
@@ -472,16 +473,38 @@
           document.getElementById('mqtt-connection-status').style.color = 'red';
         });
         
-        // Ping the MQTT connection every 30 seconds to keep it alive
+        // Ping the MQTT connection every 10 seconds to keep it alive
         setInterval(() => {
           if (mqttClient.connected) {
             console.log('Pinging MQTT connection at ' + new Date().toLocaleTimeString());
-            mqttClient.publish('test/ping', 'ping', {qos: 0});
+            mqttClient.publish('test/ping', 'ping', {qos: 1});
           } else {
             console.log('MQTT not connected, attempting to reconnect...');
             mqttClient.reconnect();
           }
-        }, 30000);
+        }, 10000);
+        
+        // Tambahkan watchdog timer untuk memantau aktivitas MQTT
+        let lastMessageTime = Date.now();
+        setInterval(() => {
+          const now = Date.now();
+          const timeSinceLastMessage = now - lastMessageTime;
+          console.log(`Time since last message: ${timeSinceLastMessage/1000} seconds`);
+          
+          // Jika tidak ada pesan selama 30 detik, coba reconnect
+          if (timeSinceLastMessage > 30000) {
+            console.log('No messages received for 30 seconds, attempting to reconnect...');
+            try {
+              mqttClient.end(true); // Force disconnect
+              setTimeout(() => {
+                mqttClient.reconnect();
+              }, 1000);
+              lastMessageTime = now; // Reset timer
+            } catch (error) {
+              console.error('Error during reconnect:', error);
+            }
+          }
+        }, 15000);
         
         return mqttClient;
       } catch (error) {
