@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>IoT Locator Testing Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    .device-id-tooltip {
+      background-color: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #333;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .device-id-tooltip:before {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: 50%;
+      margin-left: -5px;
+      border-width: 5px 5px 0;
+      border-style: solid;
+      border-color: white transparent transparent;
+    }
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+    .info-panel {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+      max-width: 300px;
+    }
+    .mqtt-status {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+      max-width: 300px;
+    }
+    .status-connected {
+      color: green;
+      font-weight: bold;
+    }
+    .status-disconnected {
+      color: red;
+      font-weight: bold;
+    }
+    .floating-button {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+    }
+    .floating-right {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      gap: 10px;
+    }
+    .btn {
+      background: white;
+      border: 1px solid #ddd;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-weight: 500;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      cursor: pointer;
+    }
+    .btn:hover {
+      transform: scale(1.05);
+      transition: transform 0.2s;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50">
+  <div id="map-container" class="relative h-full w-full">
+    <div id="map" class="absolute inset-0 z-0"></div>
+  </div>
+
+  <div class="floating-button">
+    <button id="manageDeviceButton" class="btn">Manage Device</button>
+  </div>
+
+  <div class="floating-right">
+    <button id="accountButton" class="btn">Account</button>
+    <button id="logoutButton" class="btn">Logout</button>
+  </div>
+
+  <!-- MQTT Status panel dihilangkan sesuai permintaan -->
+
+  <script>
+    // Custom marker icons
+    function getDelayDivIcon() {
+      return L.divIcon({
+        className: 'custom-delay-icon',
+        html: `<div style="width:22px;height:22px;background:#f00;border-radius:50%;border:2px solid #fff;"></div>`,
+        iconSize: [22,22],
+        iconAnchor: [11,11]
+      });
+    }
+    
+    function getOfflineDivIcon() {
+      return L.divIcon({
+        className: 'custom-offline-icon',
+        html: `<div style="width:22px;height:22px;background:#f00;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:16px;">×</div>`,
+        iconSize: [22,22],
+        iconAnchor: [11,11]
+      });
+    }
+
+    // Store device data
+    let deviceMarkers = {};
+    let deviceTopicMap = {};
+    let messageCount = 0;
+    
+    // Store previous valid values
+    const previousValues = {};
+
+    // Function to calculate electricity cost
+    function hitungBiaya(kwh) {
+      const tarifPerKwh = 1444.7; // Tarif PLN per kWh
+      return Math.round(kwh * tarifPerKwh);
+    }
+
+    // Function to render device popup
+    function renderDevicePopup(device) {
+      // Helper untuk ambil satuan dari topics
+      function getUnit(label) {
+        if (!device.topics) return '';
+        // Cari topic dengan keterangan yang cocok (case-insensitive)
+        const found = device.topics.find(t => t.keterangan && t.keterangan.toLowerCase().includes(label.toLowerCase()));
+        return found && found.unit ? found.unit : '';
+      }
+      
+      // Default units based on Arduino code
+      const defaultUnits = {
+        tegangan: 'V',
+        arus: 'A',
+        daya: 'W',
+        kwh: 'Kwh',
+        pf: ''
+      };
+      
+      // Get unit or use default
+      function getUnitOrDefault(label) {
+        const unit = getUnit(label);
+        return unit || defaultUnits[label.toLowerCase()] || '';
+      }
+      
+      return `
+        <div class="text-sm space-y-1">
+          <table class="w-full text-left">
+            <tbody>
+              <tr>
+                <td class="pr-1 font-semibold">ID Device</td>
+                <td class="px-1 font-semibold">:</td>
+                <td>${device.id || '-'}</td>
+              </tr>
+              <tr>
+                <td class="pr-1 font-semibold">Tegangan</td>
+                <td class="px-1 font-semibold">:</td>
+                <td>${device.liveData?.tegangan || '-'} ${getUnitOrDefault('tegangan')}</td>
+              </tr>
+              <tr>
+                <td class="pr-1 font-semibold">Arus</td>
+                <td class="px-1 font-semibold">:</td>
+                <td>${device.liveData?.arus || '-'} ${getUnitOrDefault('arus')}</td>
+              </tr>
+              <tr>
+                <td class="pr-1 font-semibold">Daya Listrik</td>
+                <td class="px-1 font-semibold">:</td>
+                <td>${device.liveData?.daya || '-'} ${getUnitOrDefault('daya')}</td>
+              </tr>
+              <tr>
+                <td class="pr-1 font-semibold">Kwh</td>
+                <td class="px-1 font-semibold">:</td>
+                <td>${device.liveData?.kwh || '-'} ${getUnitOrDefault('kwh')}</td>
+              </tr>
+              <tr>
+                <td class="pr-1 font-semibold">Power Factor</td>
+                <td class="px-1 font-semibold">:</td>
+                <td>${device.liveData?.pf || '-'} ${getUnitOrDefault('pf')}</td>
+              </tr>
+              <tr>
+                <td class="pr-1 font-semibold">Biaya</td>
+                <td class="px-1 font-semibold">:</td>
+                <td>Rp ${device.liveData?.biaya !== '-' ? Number(device.liveData.biaya).toLocaleString('id-ID') : '-'}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pt-2 mt-1 border-t text-xs text-gray-600">
+            📍 Alamat : ${device.alamatLokasi || '-'}
+          </div>
+        </div>
+      `;
+    }
+
+    // Initialize map
+    function initMap() {
+      try {
+        console.log('Starting map initialization...');
+        
+        const mapElement = document.getElementById('map');
+        if (!mapElement) {
+          console.error('Map element not found');
+          return;
+        }
+        
+        // Initialize Leaflet map
+        const map = L.map('map', {
+          zoomControl: true,
+          center: [-8.67735608285753, 115.22865608120843],
+          zoom: 15
+        });
+        
+        console.log('Leaflet map created');
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(map);
+        
+        // Force map to re-render
+        map.invalidateSize();
+        
+        // Tambahkan marker tetap pada koordinat yang diberikan
+        const pdmDevice = {
+          id: "PDM1023",
+          alamatLokasi: "Jalan Tukad Yeh Aya No. 18x, Denpasar",
+          latlong: "-8.67735608285753,115.22865608120843",
+          liveData: {
+            tegangan: "219.1",
+            arus: "1.17",
+            daya: "180.0",
+            kwh: "80.095",
+            pf: "0.7",
+            biaya: "115670"
+          },
+          topics: [
+            { topic: "sensor/tegangan", keterangan: "tegangan", unit: "V" },
+            { topic: "sensor/arus", keterangan: "arus", unit: "A" },
+            { topic: "sensor/daya", keterangan: "daya", unit: "W" },
+            { topic: "sensor/kwh", keterangan: "kwh", unit: "Kwh" },
+            { topic: "sensor/pf", keterangan: "pf", unit: "" }
+          ]
+        };
+        
+        // Tambahkan marker untuk device
+        const devMarker = L.marker([-8.67735608285753, 115.22865608120843], {
+          title: pdmDevice.id
+        }).addTo(map);
+        
+        devMarker.bindPopup(renderDevicePopup(pdmDevice));
+        devMarker.bindTooltip(pdmDevice.id, {
+          permanent: true,
+          direction: 'top',
+          offset: [0, -10],
+          className: 'device-id-tooltip'
+        });
+        
+        // Add lastUpdate for data status
+        const now = Date.now();
+        pdmDevice.lastUpdate = now;
+        deviceMarkers[pdmDevice.id] = { marker: devMarker, device: pdmDevice };
+        
+        // Map all topics belonging to the device
+        pdmDevice.topics.forEach(t => {
+          if (t.topic) {
+            console.log(`Mapping topic ${t.topic} to device ${pdmDevice.id}`);
+            deviceTopicMap[t.topic] = pdmDevice.id;
+          }
+        });
+        
+        // Update popup when opened
+        devMarker.on('popupopen', function() {
+          devMarker.setPopupContent(renderDevicePopup(pdmDevice));
+        });
+        
+        // Buka popup secara otomatis
+        devMarker.openPopup();
+        
+        // Initialize MQTT connection
+        initMqttConnection();
+        
+        return map;
+      } catch (error) {
+        console.error('Error initializing map:', error);
+      }
+    }
+
+    // Initialize MQTT connection
+    function initMqttConnection() {
+      // MQTT client configuration
+      const mqttConfig = {
+        connectTimeout: 4000,
+        reconnectPeriod: 2000,  
+        username: 'duwiarsana',
+        password: 'Duwiarsana1234!?',
+        clientId: 'testing_dashboard_' + Math.random().toString(16).substr(2, 8),
+        keepalive: 60,  
+        clean: true     
+      };
+
+      console.log('Initializing MQTT connection...');
+      document.getElementById('mqtt-connection-status').textContent = 'Connecting...';
+      document.getElementById('mqtt-connection-status').style.color = 'orange';
+      
+      try {
+        // Initialize MQTT client
+        const mqttClient = mqtt.connect('wss://1115a4b6fe5c40e588a3a85468f3c8be.s1.eu.hivemq.cloud:8884/mqtt', mqttConfig);
+
+        // MQTT event handlers
+        mqttClient.on('connect', () => {
+          console.log('MQTT Connected at ' + new Date().toLocaleTimeString());
+          document.getElementById('mqtt-connection-status').textContent = 'Connected';
+          document.getElementById('mqtt-connection-status').style.color = 'green';
+          
+          // Subscribe to all topics
+          mqttClient.subscribe('#', {qos: 1}, (err) => {
+            if (err) {
+              console.error('Error subscribing to all topics:', err);
+            } else {
+              console.log('Successfully subscribed to all topics');
+            }
+          });
+          
+          // Also subscribe to specific topics with QoS 1
+          const specificTopics = ['sensor/tegangan', 'sensor/arus', 'sensor/daya', 'sensor/kwh', 'sensor/pf'];
+          specificTopics.forEach(topic => {
+            mqttClient.subscribe(topic, {qos: 1}, (err) => {
+              if (err) {
+                console.error(`Error subscribing to ${topic}:`, err);
+              } else {
+                console.log(`Successfully subscribed to ${topic}`);
+              }
+            });
+          });
+          
+          // Subscribe to all topics from devices
+          const topics = [];
+          for (const topic in deviceTopicMap) {
+            mqttClient.subscribe(topic, {qos: 1});
+            console.log(`Subscribed to topic: ${topic}`);
+            topics.push(topic);
+          }
+          
+          document.getElementById('mqtt-topics').innerHTML = `<strong>Subscribed topics:</strong><br>` + 
+            specificTopics.join('<br>') + '<br>#';
+            
+          // Publish test message to verify connection
+          mqttClient.publish('test/connection', 'Dashboard connected at ' + new Date().toLocaleTimeString(), {qos: 1});
+        });
+
+        mqttClient.on('message', (topic, message) => {
+          const payload = message.toString();
+          const timestamp = new Date().toLocaleTimeString();
+          console.log(`[${timestamp}] MQTT message received: ${topic} = ${payload}`);
+          messageCount++;
+          document.getElementById('mqtt-messages').textContent = `Messages received: ${messageCount} (Last: ${timestamp})`;
+          
+          // Find device ID that has this topic
+          const deviceId = deviceTopicMap[topic];
+          if (deviceId && deviceMarkers[deviceId]) {
+            const { marker, device } = deviceMarkers[deviceId];
+            // Update lastUpdate whenever data arrives
+            device.lastUpdate = Date.now();
+            
+            // Initialize previousValues for this device if not exists
+            if (!previousValues[deviceId]) {
+              previousValues[deviceId] = {
+                tegangan: "-",
+                arus: "-",
+                daya: "-",
+                kwh: "-",
+                pf: "-",
+                biaya: "-"
+              };
+            }
+            
+            // Update liveData according to topic type, handle NaN values
+            if (/tegangan/i.test(topic)) {
+              const value = parseFloat(payload);
+              device.liveData.tegangan = isNaN(value) ? previousValues[deviceId].tegangan : payload;
+              previousValues[deviceId].tegangan = device.liveData.tegangan;
+              console.log(`Updated tegangan to ${device.liveData.tegangan}`);
+            }
+            if (/arus/i.test(topic)) {
+              const value = parseFloat(payload);
+              device.liveData.arus = isNaN(value) ? previousValues[deviceId].arus : payload;
+              previousValues[deviceId].arus = device.liveData.arus;
+              console.log(`Updated arus to ${device.liveData.arus}`);
+            }
+            if (/daya/i.test(topic)) {
+              const value = parseFloat(payload);
+              device.liveData.daya = isNaN(value) ? previousValues[deviceId].daya : payload;
+              previousValues[deviceId].daya = device.liveData.daya;
+              console.log(`Updated daya to ${device.liveData.daya}`);
+            }
+            if (/kwh/i.test(topic)) {
+              const value = parseFloat(payload);
+              if (!isNaN(value)) {
+                device.liveData.kwh = payload;
+                device.liveData.biaya = hitungBiaya(value);
+                previousValues[deviceId].kwh = device.liveData.kwh;
+                previousValues[deviceId].biaya = device.liveData.biaya;
+                console.log(`Updated kwh to ${device.liveData.kwh} and biaya to ${device.liveData.biaya}`);
+              } else {
+                device.liveData.kwh = previousValues[deviceId].kwh;
+                device.liveData.biaya = previousValues[deviceId].biaya;
+              }
+            }
+            if (/pf/i.test(topic)) {
+              const value = parseFloat(payload);
+              device.liveData.pf = isNaN(value) ? previousValues[deviceId].pf : payload;
+              previousValues[deviceId].pf = device.liveData.pf;
+              console.log(`Updated pf to ${device.liveData.pf}`);
+            }
+            
+            // If popup is open, update popup
+            if (marker.isPopupOpen && marker.isPopupOpen()) {
+              marker.setPopupContent(renderDevicePopup(device));
+              console.log('Updated popup content');
+            }
+          } else {
+            console.log(`No device found for topic ${topic}`);
+          }
+        });
+
+        mqttClient.on('error', (err) => {
+          console.error('MQTT Error:', err);
+          document.getElementById('mqtt-connection-status').textContent = 'Error: ' + err.message;
+          document.getElementById('mqtt-connection-status').style.color = 'red';
+        });
+        
+        mqttClient.on('offline', () => {
+          console.log('MQTT Client Offline at ' + new Date().toLocaleTimeString());
+          document.getElementById('mqtt-connection-status').textContent = 'Offline';
+          document.getElementById('mqtt-connection-status').style.color = 'orange';
+        });
+        
+        mqttClient.on('reconnect', () => {
+          console.log('MQTT Reconnecting at ' + new Date().toLocaleTimeString());
+          document.getElementById('mqtt-connection-status').textContent = 'Reconnecting...';
+          document.getElementById('mqtt-connection-status').style.color = 'orange';
+        });
+        
+        mqttClient.on('disconnect', () => {
+          console.log('MQTT Disconnected at ' + new Date().toLocaleTimeString());
+          document.getElementById('mqtt-connection-status').textContent = 'Disconnected';
+          document.getElementById('mqtt-connection-status').style.color = 'red';
+        });
+        
+        // Ping the MQTT connection every 30 seconds to keep it alive
+        setInterval(() => {
+          if (mqttClient.connected) {
+            console.log('Pinging MQTT connection at ' + new Date().toLocaleTimeString());
+            mqttClient.publish('test/ping', 'ping', {qos: 0});
+          } else {
+            console.log('MQTT not connected, attempting to reconnect...');
+            mqttClient.reconnect();
+          }
+        }, 30000);
+        
+        return mqttClient;
+      } catch (error) {
+        console.error('Error connecting to MQTT:', error);
+        document.getElementById('mqtt-connection-status').textContent = 'Connection Error';
+        document.getElementById('mqtt-connection-status').className = 'status-disconnected';
+      }
+    }
+
+    // Button event handlers
+    document.getElementById('manageDeviceButton').addEventListener('click', function() {
+      alert('Manage Device functionality is disabled in testing view');
+    });
+    
+    document.getElementById('accountButton').addEventListener('click', function() {
+      alert('Account functionality is disabled in testing view');
+    });
+    
+    document.getElementById('logoutButton').addEventListener('click', function() {
+      alert('Logout functionality is disabled in testing view');
+    });
+
+    // Initialize dashboard when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('Page loaded, initializing map');
+      initMap();
+      // Initialize MQTT connection after a short delay
+      setTimeout(initMqttConnection, 1000);
+    });
+
+    // Check data status every 5 seconds, change marker to red if no data
+    setInterval(() => {
+      const now = Date.now();
+      const THRESHOLD_RED = 10000; // 10 seconds
+      const THRESHOLD_OFFLINE = 60000; // 1 minute
+      Object.values(deviceMarkers).forEach(({ marker, device }) => {
+        if (!device.lastUpdate || now - device.lastUpdate > THRESHOLD_OFFLINE) {
+          // More than 1 minute: offline icon with X
+          marker.setIcon(getOfflineDivIcon());
+        } else if (now - device.lastUpdate > THRESHOLD_RED) {
+          // More than 10 seconds: red icon
+          marker.setIcon(getDelayDivIcon());
+        } else {
+          // Normal: default icon
+          marker.setIcon(L.Icon.Default.prototype);
+        }
+      });
+    }, 5000);
+  </script>
+</body>
+</html>
