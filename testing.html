@@ -229,7 +229,7 @@
         
         // Initialize Leaflet map
         const map = L.map('map', {
-          zoomControl: true,
+          zoomControl: false,
           center: [-8.67735608285753, 115.22865608120843],
           zoom: 15
         });
@@ -328,8 +328,6 @@
       };
 
       console.log('Initializing MQTT connection...');
-      document.getElementById('mqtt-connection-status').textContent = 'Connecting...';
-      document.getElementById('mqtt-connection-status').style.color = 'orange';
       
       try {
         // Tutup koneksi yang ada jika masih ada
@@ -347,9 +345,8 @@
 
         // MQTT event handlers
         globalMqttClient.on('connect', () => {
-          console.log('MQTT Connected at ' + new Date().toLocaleTimeString());
-          document.getElementById('mqtt-connection-status').textContent = 'Connected';
-          document.getElementById('mqtt-connection-status').style.color = 'green';
+          console.log('[MQTT] Connected at ' + new Date().toLocaleTimeString());
+          // Jangan update UI status, elemen sudah tidak ada
           
           // Subscribe to all topics
           globalMqttClient.subscribe('#', {qos: 1}, (err) => {
@@ -380,7 +377,7 @@
             topics.push(topic);
           }
           
-          document.getElementById('mqtt-topics').innerHTML = `<strong>Subscribed topics:</strong><br>` + 
+
             specificTopics.join('<br>') + '<br>#';
             
           // Publish test message to verify connection
@@ -390,9 +387,9 @@
         globalMqttClient.on('message', (topic, message) => {
           const payload = message.toString();
           const timestamp = new Date().toLocaleTimeString();
-          console.log(`[${timestamp}] MQTT message received: ${topic} = ${payload}`);
-          messageCount++;
-          lastMessageTime = Date.now(); // Update timestamp terakhir kali pesan diterima
+          console.log(`[MQTT][MESSAGE][${timestamp}] Message received: ${topic} = ${payload}`);
+          lastMessageTime = Date.now();
+          // TODO: Update marker dan popup
           
           // Find device ID that has this topic
           const deviceId = deviceTopicMap[topic];
@@ -463,20 +460,20 @@
         });
 
         globalMqttClient.on('error', (err) => {
-          console.error('MQTT Error:', err);
-          console.log('MQTT Error at ' + new Date().toLocaleTimeString() + ':', err.message);
+          console.error('[MQTT] Error:', err);
+          console.log('[MQTT] Error at ' + new Date().toLocaleTimeString() + ':', err.message);
         });
         
         globalMqttClient.on('offline', () => {
-          console.log('MQTT Client Offline at ' + new Date().toLocaleTimeString());
+          console.warn('[MQTT] Client Offline at ' + new Date().toLocaleTimeString());
         });
         
         globalMqttClient.on('reconnect', () => {
-          console.log('MQTT Reconnecting at ' + new Date().toLocaleTimeString());
+          console.warn('[MQTT] Reconnecting at ' + new Date().toLocaleTimeString());
         });
         
         globalMqttClient.on('disconnect', () => {
-          console.log('MQTT Disconnected at ' + new Date().toLocaleTimeString());
+          console.warn('[MQTT] Disconnected at ' + new Date().toLocaleTimeString());
         });
         
         // Ping the MQTT connection every 5 seconds to keep it alive
