@@ -65,7 +65,12 @@ async function handleRegister(event) {
     }
 
     try {
-        const response = await fetch('http://localhost:3001/register', {
+        const BACKEND_URL =
+  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://localhost:3001"
+    : "http://iot-backend:3000";
+
+const response = await fetch(`${BACKEND_URL}/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -198,8 +203,8 @@ window.initDashboard = function() {
 const mqttConfig = {
     connectTimeout: 4000,
     reconnectPeriod: 4000,
-    username: 'duwiarsana',
-    password: 'Duwiarsana1234!?',
+    username: 'Test1234',
+    password: 'Test1234',
 };
 
 // Initialize MQTT client
@@ -548,7 +553,7 @@ window.submitEditDevice = function(id) {
     let alamatLokasi = alamatLokasiInput && alamatLokasiInput.value ? alamatLokasiInput.value : '';
     if (alamatLokasi === '[object Object]') alamatLokasi = '';
     console.log('Alamat yang akan dikirim:', alamatLokasi);
-    fetch(`http://localhost:3001/devices/${id}`, {
+    fetch(`${BACKEND_URL}/devices/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ latlong, alamatLokasi, mqttIp, mqttPort, mqttUsername, mqttPassword, topics })
@@ -566,7 +571,7 @@ window.submitEditDevice = function(id) {
 
 // Edit Device
 window.editDevice = function(id) {
-    fetch(`http://localhost:3001/devices/${id}`)
+    fetch(`${BACKEND_URL}/devices/${id}`)
         .then(res => res.json())
         .then(device => {
             const area = document.getElementById('floatingArea');
